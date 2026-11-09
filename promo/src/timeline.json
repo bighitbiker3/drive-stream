@@ -1,0 +1,15 @@
+{
+  "fps": 30,
+  "transition": 16,
+  "scenes": [
+    ["problem", 200],
+    ["reveal", 150],
+    ["how", 270],
+    ["speed", 190],
+    ["creative", 270],
+    ["uploads", 210],
+    ["dashboard", 165],
+    ["features", 165],
+    ["outro", 180]
+  ]
+}

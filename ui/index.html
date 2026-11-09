@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive Stream</title>
+<link rel="icon" type="image/png" href="/icon.png">
+<style>
+  :root {
+    --bg: #f5f5f7; --card: #fff; --text: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea;
+    --accent: #0a84ff; --green: #30a14e; --amber: #c27c0e; --red: #d70015; --track: #e9e9ee;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161618; --card: #232326; --text: #f2f2f7; --muted: #98989f; --line: #333337;
+            --accent: #3a95ff; --green: #3fb950; --amber: #e3a008; --red: #ff6961; --track: #3a3a3e; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 28px 20px 60px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  header svg { flex: none; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+          font-size: 12px; font-weight: 600; background: var(--track); white-space: nowrap; }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .ok { color: var(--green); } .warn { color: var(--amber); } .bad { color: var(--red); }
+  .card { background: var(--card); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px;
+          box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 0 0 1px var(--line); }
+  .card h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: baseline; gap: 10px; }
+  .card h2 .meta { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .card h2 .right { margin-left: auto; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 7px 13px; cursor: pointer; white-space: nowrap;
+           background: var(--accent); color: #fff; }
+  button.ghost { background: var(--track); color: var(--text); }
+  button:disabled { opacity: .5; cursor: default; }
+  input { font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .banner { border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-weight: 500;
+            background: color-mix(in srgb, var(--red) 12%, var(--card)); color: var(--red);
+            display: flex; align-items: center; gap: 12px; }
+  .banner span { flex: 1; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .upload { padding: 10px 0; border-top: 1px solid var(--line); }
+  .upload:first-child { border-top: 0; padding-top: 2px; }
+  .upload .name { font-weight: 600; overflow-wrap: anywhere; }
+  .upload .dir { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; margin: 7px 0 4px; }
+  .bar > div { height: 100%; background: var(--accent); border-radius: 3px; transition: width .6s ease; }
+  .bar.idle > div { background: var(--muted); opacity: .4; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 7px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:first-child td { border-top: 0; }
+  td.num { text-align: right; white-space: nowrap; color: var(--muted); padding-left: 12px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 6px;
+           background: color-mix(in srgb, currentColor 14%, transparent); white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 14px; }
+  .stat .k { font-size: 12px; color: var(--muted); }
+  .stat .v { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  .empty { color: var(--muted); padding: 6px 0 2px; }
+  .ev { padding: 5px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .ev:first-child { border-top: 0; }
+  ol.steps { margin: 6px 0 0; padding-left: 20px; } ol.steps li { margin: 6px 0; }
+  a { color: var(--accent); }
+  code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="/icon.png" width="44" height="44" alt="" style="flex:none">
+    <div>
+      <h1>Drive Stream</h1>
+      <div class="sub" id="account">…</div>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill" id="phase">Connecting…</span>
+    <button class="ghost" id="finder" title="Open the drive in Finder">Open in Finder</button>
+  </header>
+
+  <div class="banner" id="problem" hidden>
+    <span><span id="problem-text"></span>
+      <a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Publish your app ↗</a></span>
+    <button id="problem-fix">Sign in again</button>
+  </div>
+
+  <section class="card" id="signin" hidden>
+    <h2>Sign in to Google <span class="meta" id="signin-why"></span></h2>
+    <div id="client-fields" hidden>
+      <div class="muted small">First time here: enter the OAuth client from your Google Cloud project
+        (Google Auth Platform → Clients → your Desktop client).</div>
+      <label for="cid">Client ID</label><input id="cid" placeholder="…apps.googleusercontent.com" autocomplete="off">
+      <label for="csec">Client secret</label><input id="csec" placeholder="GOCSPX-…" autocomplete="off" type="password">
+      <div style="height:12px"></div>
+    </div>
+    <div id="step1" class="row">
+      <button id="start">Sign in with Google</button>
+      <span class="muted small">Opens Google in a new tab.</span>
+    </div>
+    <div id="step2" hidden>
+      <ol class="steps">
+        <li>Approve access in the Google tab (<a id="again" target="_blank" rel="noopener">open it again</a>).
+            If Google says the app isn't verified, click <b>Advanced → Go to …</b>: it's your own app.</li>
+        <li>On this Mac, that's it. On another device the last page says <i>“This site can't be reached”</i>:
+            copy that page's address and paste it here.</li>
+      </ol>
+      <div class="row" style="margin-top:10px">
+        <input id="pasted" placeholder="http://127.0.0.1:…/?state=…&code=…" style="flex:1;min-width:260px">
+        <button id="finish">Finish</button>
+        <button class="ghost" id="cancel">Cancel</button>
+      </div>
+    </div>
+    <div class="bad small" id="signin-error" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card">
+    <h2>Uploads <span class="meta" id="up-summary"></span>
+      <span class="right"><button class="ghost" id="retry" hidden>Retry now</button></span></h2>
+    <div id="active"></div>
+  </section>
+
+  <section class="card">
+    <h2>Recently uploaded <span class="meta" id="hist-summary"></span></h2>
+    <table id="history"></table>
+  </section>
+
+  <section class="card">
+    <h2>Drive <span class="meta" id="drive-path"></span>
+      <span class="right"><button class="ghost" id="switch">Switch account…</button></span></h2>
+    <div class="grid">
+      <div class="stat"><div class="k">Files</div><div class="v" id="s-files">–</div></div>
+      <div class="stat"><div class="k">Cache on this Mac</div><div class="v" id="s-cache">–</div>
+        <div class="bar"><div id="s-cache-bar" style="width:0"></div></div>
+        <button class="ghost small" id="clear" style="padding:4px 9px">Clear cache</button></div>
+      <div class="stat"><div class="k">Streamed this session</div><div class="v" id="s-down">–</div></div>
+      <div class="stat"><div class="k">Uploaded this session</div><div class="v" id="s-up">–</div></div>
+      <div class="stat"><div class="k">Google API use</div><div class="v" id="s-quota">–</div>
+        <div class="muted small">in the last minute, of 325,000 allowed</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Activity</h2>
+    <div id="events"></div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const gb = (n) => n >= 1e9 ? (n / 1e9).toFixed(n >= 1e10 ? 1 : 2) + " GB" : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e8 ? 0 : 1) + " MB"
+                 : n >= 1e3 ? Math.round(n / 1e3) + " KB" : (n || 0) + " B";
+const dur = (s) => s < 60 ? Math.max(1, Math.round(s)) + "s" : s < 3600 ? Math.round(s / 60) + " min"
+                 : (s / 3600).toFixed(1) + " h";
+const ago = (t) => { const s = Date.now() / 1000 - t; return s < 45 ? "just now" : dur(s) + " ago"; };
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body === undefined ? "GET" : "POST",
+    headers: { "X-Drive-Stream": "1", "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+let wantSignin = false, last = null;
+const speeds = {};
+
+function render(st) {
+  last = st;
+  const acct = st.account;
+  $("#account").textContent = acct.email ? acct.email : "Not signed in";
+  const pill = $("#phase");
+  pill.textContent = acct.problem ? "Sign-in expired" : st.phase;
+  pill.className = "pill " + (acct.problem ? "bad" : st.mounted && st.phase === "Mounted" ? "ok" : /fail|Couldn't|error/i.test(st.phase) ? "bad" : "warn");
+  $("#finder").disabled = !st.mounted;
+
+  $("#problem").hidden = !acct.problem;
+  $("#problem-text").textContent = acct.problem || "";
+
+  const showSignin = !acct.signed_in || wantSignin || st.signin.in_progress;
+  $("#signin").hidden = !showSignin;
+  $("#client-fields").hidden = acct.client_configured;
+  $("#signin-why").textContent = !acct.signed_in ? "needed before your drive can mount" : acct.problem ? "your sign-in expired" : "";
+  $("#step1").hidden = st.signin.in_progress;
+  $("#step2").hidden = !st.signin.in_progress;
+  if (st.signin.url) $("#again").href = st.signin.url;
+  $("#signin-error").textContent = st.signin.error || "";
+  if (acct.signed_in && !acct.problem && !st.signin.in_progress && wantSignin === "done") wantSignin = false;
+
+  $("#drive-path").textContent = st.mountpoint_display || st.mountpoint;
+
+  // Uploads in progress
+  const up = st.uploads;
+  const active = up ? up.active : [];
+  const now = Date.now() / 1000;
+  let left = 0, uploading = 0, waiting = 0, problems = false;
+  $("#active").innerHTML = active.length ? active.map((u) => {
+    const parts = u.path.split("/"), name = parts.pop(), dir = parts.join("/");
+    left += u.bytes - u.sent;
+    let line, pct = u.bytes ? (100 * u.sent / u.bytes) : 0, idle = u.state !== "uploading";
+    if (u.state === "uploading") {
+      uploading++;
+      const prev = speeds[u.path];
+      let v = prev ? prev.v : 0;
+      if (prev && now > prev.t && u.sent >= prev.sent) v = 0.7 * v + 0.3 * ((u.sent - prev.sent) / (now - prev.t));
+      speeds[u.path] = { t: now, sent: u.sent, v };
+      const eta = v > 1e4 ? " · " + dur((u.bytes - u.sent) / v) + " left" : "";
+      const speed = v > 1e4 ? (v / 1e6).toFixed(1) + " MB/s" : esc(u.detail);  // server's average until we have our own
+      line = `${gb(u.sent)} of ${gb(u.bytes)} · ${speed}${eta}`;
+    } else {
+      waiting++;
+      line = `${gb(u.bytes)} · ${esc(u.detail)}`;
+      if (u.state === "stopped") problems = true;
+    }
+    if (u.error) problems = true;
+    return `<div class="upload"><div class="name">${esc(name)}</div>
+      ${dir ? `<div class="dir">${esc(dir)}</div>` : ""}
+      <div class="bar ${idle ? "idle" : ""}"><div style="width:${pct.toFixed(1)}%"></div></div>
+      <div class="small ${u.state === "stopped" ? "bad" : "muted"}">${line}${u.error ? ` · <span class="bad">last try failed: ${esc(u.error)}</span>` : ""}</div></div>`;
+  }).join("") : `<div class="empty">${up ? "Nothing to upload. Anything you copy into the drive uploads automatically." : "Starts once the drive is mounted."}</div>`;
+  $("#up-summary").textContent = active.length
+    ? [uploading && `${uploading} uploading`, waiting && `${waiting} waiting`, `${gb(left)} to go`].filter(Boolean).join(" · ") : "";
+  $("#retry").hidden = !problems;
+
+  // History
+  const hist = up ? up.history : [];
+  $("#hist-summary").textContent = up ? `${up.totals.uploads} uploaded, ${up.totals.failures} failed attempts this session` : "";
+  $("#history").innerHTML = hist.length ? hist.slice(0, 25).map((h) => {
+    const parts = h.path.split("/"), name = parts.pop(), dir = parts.join("/");
+    const badge = h.error ? `<span class="badge bad" title="${esc(h.error)}">${/not retrying/.test(h.error) ? "failed" : h.attempts > 1 ? `failed ${h.attempts}×, will retry` : "failed, will retry"}</span>`
+      : h.verified === true ? `<span class="badge ok" title="Drive's MD5 matches the file you copied">verified</span>`
+      : h.verified === false ? `<span class="badge bad">checksum mismatch, re-uploading</span>` : "";
+    return `<tr><td><b>${esc(name)}</b>${badge}<div class="muted small">${esc(dir)}${h.new_revision ? " · new version" : ""}</div></td>
+      <td class="num">${gb(h.bytes)}<div class="small">${dur(h.seconds)}</div></td>
+      <td class="num">${ago(h.finished_at)}</td></tr>`;
+  }).join("") : `<tr><td class="empty">No uploads yet this session.</td></tr>`;
+
+  // Drive stats
+  const d = st.drive;
+  if (d) {
+    $("#s-files").textContent = d.files.toLocaleString();
+    $("#s-cache").innerHTML = `${gb(d.cache_bytes)} <span class="muted small" style="font-weight:400">of ${gb(d.cache_budget)}</span>`;
+    $("#s-cache-bar").style.width = Math.min(100, 100 * d.cache_bytes / d.cache_budget).toFixed(1) + "%";
+    $("#s-down").textContent = gb(d.bytes_downloaded);
+    $("#s-up").textContent = gb(d.bytes_uploaded);
+    $("#s-quota").textContent = d.quota_units_last_min.toLocaleString() + " units";
+  }
+  $("#clear").disabled = !d;
+
+  // Activity
+  $("#events").innerHTML = st.events.length ? st.events.map((e) =>
+    `<div class="ev"><span class="${e.level === "error" ? "bad" : e.level === "warn" ? "warn" : ""}">${esc(e.msg)}</span>
+     <span class="muted small"> · ${ago(e.at)}</span></div>`).join("") : `<div class="empty">Nothing notable.</div>`;
+}
+
+async function tick() {
+  try { render(await api("/api/status")); }
+  catch (e) { const p = $("#phase"); p.textContent = "Can't reach Drive Stream"; p.className = "pill bad"; }
+}
+
+$("#start").onclick = async () => {
+  const w = window.open("about:blank", "_blank");   // open synchronously so popup blockers allow it
+  try {
+    const r = await api("/api/signin/start", { client_id: $("#cid").value, client_secret: $("#csec").value });
+    wantSignin = "done";
+    if (w) w.location = r.url; else window.open(r.url, "_blank");
+    tick();
+  } catch (e) { if (w) w.close(); $("#signin-error").textContent = e.message; }
+};
+$("#finish").onclick = async () => {
+  try { const r = await api("/api/signin/finish", { redirect: $("#pasted").value }); $("#pasted").value = ""; wantSignin = false; tick(); }
+  catch (e) { $("#signin-error").textContent = e.message; }
+};
+$("#cancel").onclick = async () => { await api("/api/signin/cancel", {}); wantSignin = false; tick(); };
+$("#problem-fix").onclick = $("#switch").onclick = () => { wantSignin = true; if (last) render(last); $("#signin").scrollIntoView({ behavior: "smooth" }); };
+$("#finder").onclick = () => api("/api/open-finder", {}).catch((e) => alert(e.message));
+$("#retry").onclick = () => api("/api/uploads/retry", {}).then(tick);
+$("#clear").onclick = async () => {
+  if (!confirm("Delete everything cached on this Mac? Files stay in Google Drive; they'll stream again when opened.")) return;
+  const r = await api("/api/cache/clear", {}); tick();
+};
+tick(); setInterval(tick, 1000);
+</script>
+</body>
+</html>

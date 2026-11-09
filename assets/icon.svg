@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Drive Stream app icon. Source of truth: build sizes with assets/build-icons.sh -->
+  <defs>
+    <linearGradient id="bg" x1="180" y1="120" x2="860" y2="920" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#36D1FF"/>
+      <stop offset="0.55" stop-color="#3A7BFF"/>
+      <stop offset="1" stop-color="#4B3BEA"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="512" cy="150" r="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dy="12" result="b"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.32"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="10"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.22"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- macOS icon grid: 824×824 body, 100px margin -->
+  <g filter="url(#shadow)">
+    <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+    <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#sheen)"/>
+  </g>
+
+  <!-- cloud with a play triangle cut through it -->
+  <g filter="url(#soft)">
+    <path fill="#fff" fill-rule="evenodd" d="
+      M 352 660
+      A 112 112 0 0 1 330 438
+      A 168 168 0 0 1 652 404
+      A 128 128 0 0 1 690 660
+      Z
+      M 470 448
+      Q 470 428 488 438
+      L 598 506
+      Q 614 516 598 526
+      L 488 594
+      Q 470 604 470 584
+      Z"/>
+  </g>
+
+  <!-- the stream: data flowing down to the Mac -->
+  <rect x="372" y="716" width="280" height="34" rx="17" fill="#fff" fill-opacity="0.72"/>
+  <rect x="432" y="782" width="160" height="34" rx="17" fill="#fff" fill-opacity="0.42"/>
+</svg>

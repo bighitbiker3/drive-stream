@@ -1,0 +1,23 @@
+{
+  "name": "drive-stream-promo",
+  "private": true,
+  "description": "Promo video for Drive Stream, made with Remotion",
+  "license": "MIT",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render DriveStreamPromo out/drive-stream-promo.mp4",
+    "still": "remotion still DriveStreamPromo"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.542",
+    "@remotion/google-fonts": "^4.0.542",
+    "@remotion/transitions": "^4.0.542",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.542"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
+}
