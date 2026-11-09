@@ -269,6 +269,9 @@ Pending uploads finish and the drive unmounts first. Your files stay in Google D
 
 ## Privacy and security
 
+See the full [privacy policy](PRIVACY.md). In short:
+
+
 - **Everything runs on your Mac.** Drive Stream talks only to Google's APIs (`oauth2.googleapis.com`, `www.googleapis.com`). There's no server of ours, and no telemetry.
 - **Your sign-in** (Google refresh token and your OAuth client) is stored in `~/Library/Application Support/DriveStream/token.json`, readable only by you (mode 0600).
 - **The dashboard** listens on `127.0.0.1` only:
