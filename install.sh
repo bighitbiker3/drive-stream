@@ -9,6 +9,8 @@
 #   MOUNTPOINT=~/DriveStream    where the drive appears
 #   CACHE_GB=20                 how much disk the local cache may use
 #   UI_PORT=7317                dashboard port
+#   PARALLEL=8                  concurrent downloads (more helps when Google is slow)
+#   READAHEAD_MB=32             how far ahead of a video being played to fetch
 #   ALLOW_HOSTS=                extra dashboard host names, comma-separated,
 #                               for reaching it through a tunnel (".ts.net")
 #   NO_BUILD=1                  install target/Drive Stream.app as already built
@@ -19,6 +21,8 @@ cd "$(dirname "$0")"
 MOUNTPOINT="${MOUNTPOINT:-$HOME/DriveStream}"
 CACHE_GB="${CACHE_GB:-20}"
 UI_PORT="${UI_PORT:-7317}"
+PARALLEL="${PARALLEL:-8}"
+READAHEAD_MB="${READAHEAD_MB:-32}"
 ALLOW_HOSTS="${ALLOW_HOSTS:-}"
 LABEL="io.github.drivestream"
 APP_DIR="$HOME/Applications/Drive Stream.app"
@@ -58,10 +62,10 @@ cp -R "target/Drive Stream.app" "$APP_DIR"
 # --- background service
 say "Setting up the background service ($LABEL)"
 mkdir -p "$MOUNTPOINT" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
-python3 - "$PLIST" "$LABEL" "$LOG" "$APP_DIR/Contents/MacOS/drivestream" "$MOUNTPOINT" "$CACHE_GB" "$UI_PORT" "$ALLOW_HOSTS" <<'PY'
+python3 - "$PLIST" "$LABEL" "$LOG" "$APP_DIR/Contents/MacOS/drivestream" "$MOUNTPOINT" "$CACHE_GB" "$UI_PORT" "$ALLOW_HOSTS" "$PARALLEL" "$READAHEAD_MB" <<'PY'
 import plistlib, sys
-plist, label, log, exe, mount, cache_gb, port, hosts = sys.argv[1:]
-args = [exe, "serve", mount, "--cache-gb", cache_gb, "--ui-port", port]
+plist, label, log, exe, mount, cache_gb, port, hosts, parallel, readahead = sys.argv[1:]
+args = [exe, "serve", mount, "--cache-gb", cache_gb, "--ui-port", port, "--parallel", parallel, "--readahead-mb", readahead]
 for h in filter(None, (x.strip() for x in hosts.split(","))):
     args += ["--allow-host", h]
 with open(plist, "wb") as f:

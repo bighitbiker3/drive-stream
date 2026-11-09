@@ -121,6 +121,8 @@ Run it again any time to update; your sign-in and cache are kept. Settings are e
 | `MOUNTPOINT` | `~/DriveStream` | Where the drive appears |
 | `CACHE_GB` | `20` | Disk the local cache may use |
 | `UI_PORT` | `7317` | Dashboard port |
+| `PARALLEL` | `8` | Concurrent downloads; raise it (e.g. `16`) when Google is slow per connection |
+| `READAHEAD_MB` | `32` | How far ahead of a sequential read (a playing video) to fetch |
 | `ALLOW_HOSTS` | *(none)* | Extra host names for the dashboard, comma-separated (see [Remote dashboard](#reaching-the-dashboard-from-another-device)) |
 | `NO_BUILD` | | Set to install an already-built `target/Drive Stream.app` |
 | `NO_OPEN` | | Set to not open the app and dashboard afterwards |
