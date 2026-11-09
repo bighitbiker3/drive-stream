@@ -46,6 +46,8 @@ pub struct App {
     pub restarting: AtomicBool,
     phase: Mutex<String>,
     login: tokio::sync::Mutex<Option<Arc<PendingLogin>>>,
+    /// The task listening for the current sign-in's redirect.
+    login_task: Mutex<Option<tokio::task::AbortHandle>>,
     login_error: Mutex<Option<String>>,
     events: Mutex<VecDeque<serde_json::Value>>,
 }
@@ -64,6 +66,7 @@ impl App {
             restarting: AtomicBool::new(false),
             phase: Mutex::new("Starting".into()),
             login: tokio::sync::Mutex::new(None),
+            login_task: Mutex::new(None),
             login_error: Mutex::new(None),
             events: Mutex::new(VecDeque::new()),
         }
@@ -212,7 +215,9 @@ async fn status(State(app): State<Arc<App>>) -> impl IntoResponse {
 async fn signin_start(State(app): State<Arc<App>>, body: Option<Json<StartReq>>) -> Response {
     let req = body.map(|b| b.0).unwrap_or_default();
     let typed = auth::client_from_parts(req.client_id.as_deref().unwrap_or(""), req.client_secret.as_deref().unwrap_or(""));
-    let Some(client) = typed.or_else(|| app.auth.client()) else {
+    // Starting over reuses the client from a saved sign-in, or from the one in progress.
+    let pending_client = app.login.lock().await.as_ref().map(|p| p.client());
+    let Some(client) = typed.or_else(|| app.auth.client()).or(pending_client) else {
         return err(StatusCode::BAD_REQUEST, "Enter your Google OAuth client ID and secret first.");
     };
     let hint = app.auth.email();
@@ -224,13 +229,41 @@ async fn signin_start(State(app): State<Arc<App>>, body: Option<Json<StartReq>>)
     *app.login.lock().await = Some(p.clone());
     *app.login_error.lock().unwrap() = None;
     let url = p.url.clone();
-    // If the browser is on this Mac, Google's redirect lands here.
+    // If the browser is on this Mac, Google's redirect lands here. Only the
+    // newest sign-in listens: starting another closes the previous one.
     let a = app.clone();
-    tokio::spawn(async move {
-        if let Ok(Ok(code)) = tokio::time::timeout(Duration::from_secs(1800), auth::catch_redirect(listener, &p.state)).await {
-            let _ = a.complete_login(p, code).await;
-        }
+    let task = tokio::spawn(async move {
+        let listen = async {
+            loop {
+                let Ok((parsed, sock)) = auth::next_redirect(&listener, &p.state).await else { continue };
+                match parsed {
+                    Ok(code) => {
+                        // Answer the browser only once we know how it went.
+                        match a.complete_login(p.clone(), code).await {
+                            Ok(email) => {
+                                auth::respond_page(sock, true, &format!("Signed in as {email}"), "Drive Stream is syncing again. You can close this tab.").await
+                            }
+                            Err(e) => {
+                                auth::respond_page(sock, false, "Couldn't finish signing in", &format!("{e}. Go back to the Drive Stream dashboard and click “Sign in with Google” to try again.")).await
+                            }
+                        }
+                        return;
+                    }
+                    Err(e) if e.to_string().contains("Google returned an error") => {
+                        auth::respond_page(sock, false, "Sign-in was cancelled", &format!("{e}. You can start again from the Drive Stream dashboard.")).await;
+                    }
+                    Err(e) if e.to_string().contains("state mismatch") => {
+                        auth::respond_page(sock, false, "This sign-in link is out of date", "Start a new one from the Drive Stream dashboard with “Sign in with Google”.").await;
+                    }
+                    Err(_) => auth::respond_page(sock, false, "Not found", "").await,
+                }
+            }
+        };
+        let _ = tokio::time::timeout(Duration::from_secs(2 * 3600), listen).await;
     });
+    if let Some(old) = app.login_task.lock().unwrap().replace(task.abort_handle()) {
+        old.abort();
+    }
     Json(serde_json::json!({ "url": url })).into_response()
 }
 
@@ -250,6 +283,9 @@ async fn signin_finish(State(app): State<Arc<App>>, Json(req): Json<FinishReq>) 
 
 async fn signin_cancel(State(app): State<Arc<App>>) -> impl IntoResponse {
     *app.login.lock().await = None;
+    if let Some(t) = app.login_task.lock().unwrap().take() {
+        t.abort();
+    }
     Json(serde_json::json!({ "ok": true }))
 }
 

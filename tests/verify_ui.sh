@@ -32,7 +32,17 @@ echo "== sign in (browser on this Mac: loopback redirect)"
 url=$(curl -s -X POST -H 'X-Drive-Stream: 1' -H 'Content-Type: application/json' -d '{"client_id":"cid.apps.googleusercontent.com","client_secret":"GOCSPX-x"}' "$U/api/signin/start" | j 'd["url"]')
 read redir state < <(python3 -I -c "import sys,urllib.parse as u; q=dict(u.parse_qsl(u.urlparse(sys.argv[1]).query)); print(q['redirect_uri'], q['state'])" "$url")
 [ "$(st | j 'd["signin"]["in_progress"]')" = "True" ] && pass "sign-in in progress shown" || fail "no in-progress state"
-curl -s "$redir/?state=$state&code=good-code&scope=x" | grep -q "signed in" && pass "redirect page says signed in" || fail "redirect page"
+# a second "Sign in with Google" replaces the first; the old link must stop working
+old_redir=$redir
+url=$(curl -s -X POST -H 'X-Drive-Stream: 1' -H 'Content-Type: application/json' -d '{}' "$U/api/signin/start" | j 'd["url"]')
+read redir state < <(python3 -I -c "import sys,urllib.parse as u; q=dict(u.parse_qsl(u.urlparse(sys.argv[1]).query)); print(q['redirect_uri'], q['state'])" "$url")
+sleep 0.3
+curl -s -m 3 "$old_redir/?state=x&code=good-code" >/dev/null; [ $? -eq 7 ] && pass "a replaced sign-in link stops listening" || fail "old link still answers"
+curl -s "$redir/?state=WRONG&code=good-code" | grep -q "out of date" && pass "out-of-date link gets an explanation, not a fake success" || fail "wrong-state page"
+curl -s "$redir/?state=$state&error=access_denied" | grep -q "cancelled" && pass "cancelled consent gets an explanation" || fail "cancel page"
+[ "$(st | j 'd["account"]["signed_in"]')" = "False" ] && pass "still signed out after those" || fail "signed in by a bad redirect"
+page=$(curl -s "$redir/?state=$state&code=good-code&scope=x")
+echo "$page" | grep -q "Signed in as mock@example.com" && pass "redirect page confirms the real result: signed in as mock@example.com" || fail "redirect page: $(echo "$page" | head -c 200)"
 for i in $(seq 1 40); do [ "$(st | j 'd["mounted"]')" = "True" ] && break; sleep 0.5; done
 [ "$(st | j 'd["mounted"]')" = "True" ] && pass "mounted after sign-in ($(st | j 'd["account"]["email"]'))" || fail "not mounted after sign-in: $(st | j 'd["phase"]')"
 [ -f "$T/state/token.json" ] && [ "$(stat -f %Lp "$T/state/token.json")" = 600 ] && pass "sign-in saved with 0600 permissions" || fail "token file"

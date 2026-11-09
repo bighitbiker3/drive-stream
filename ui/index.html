@@ -189,7 +189,8 @@ function render(st) {
   $("#signin").hidden = !showSignin;
   $("#client-fields").hidden = acct.client_configured;
   $("#signin-why").textContent = !acct.signed_in ? "needed before your drive can mount" : acct.problem ? "your sign-in expired" : "";
-  $("#step1").hidden = st.signin.in_progress;
+  $("#step1").hidden = false;
+  $("#start").textContent = st.signin.in_progress ? "Start a new sign-in" : "Sign in with Google";
   $("#step2").hidden = !st.signin.in_progress;
   if (st.signin.url) $("#again").href = st.signin.url;
   $("#signin-error").textContent = st.signin.error || "";

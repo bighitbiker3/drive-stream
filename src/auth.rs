@@ -155,6 +155,12 @@ pub struct PendingLogin {
     scope: String,
 }
 
+impl PendingLogin {
+    pub fn client(&self) -> Client {
+        self.client.clone()
+    }
+}
+
 /// Start a sign-in. The returned listener catches Google's redirect when the
 /// browser is on this Mac; otherwise the user pastes the final address.
 pub async fn begin(client: Client, scope: &str, login_hint: Option<&str>) -> Result<(PendingLogin, tokio::net::TcpListener)> {
@@ -181,9 +187,39 @@ pub async fn begin(client: Client, scope: &str, login_hint: Option<&str>) -> Res
     Ok((p, listener))
 }
 
-/// Wait for Google's redirect on the loopback listener; returns the code.
-pub async fn catch_redirect(listener: tokio::net::TcpListener, state: &str) -> Result<String> {
-    wait_loopback(listener, state).await
+/// The next request on the loopback listener: the code it carries (or why
+/// it doesn't), plus the connection, so the caller can answer the browser
+/// once it knows whether the sign-in actually worked.
+pub async fn next_redirect(listener: &tokio::net::TcpListener, state: &str) -> Result<(Result<String>, tokio::net::TcpStream)> {
+    let (mut sock, _) = listener.accept().await?;
+    let mut buf = vec![0u8; 8192];
+    let n = sock.read(&mut buf).await?;
+    let req = String::from_utf8_lossy(&buf[..n]);
+    let path = req.lines().next().and_then(|l| l.split_whitespace().nth(1)).unwrap_or("").to_string();
+    if !path.contains("state=") && !path.contains("code=") && !path.contains("error=") {
+        return Ok((Err(anyhow!("not a sign-in redirect")), sock)); // e.g. /favicon.ico
+    }
+    Ok((code_from_redirect(&path, state), sock))
+}
+
+/// Answer the browser that landed on the loopback redirect.
+pub async fn respond_page(mut sock: tokio::net::TcpStream, ok: bool, title: &str, detail: &str) {
+    let esc = |s: &str| s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+    let (color, mark) = if ok { ("#30a14e", "✓") } else { ("#d70015", "!") };
+    let body = format!(
+        "<!doctype html><meta charset=utf-8><title>Drive Stream</title>\
+         <body style=\"font:16px -apple-system,sans-serif;display:grid;place-items:center;height:90vh;margin:0;background:#f5f5f7;color:#1d1d1f\">\
+         <div style=\"max-width:520px;text-align:center\"><div style=\"font-size:44px;color:{color}\">{mark}</div>\
+         <h2>{}</h2><p style=\"color:#6e6e73;line-height:1.5\">{}</p></div>",
+        esc(title),
+        esc(detail)
+    );
+    let resp = format!(
+        "HTTP/1.1 {}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        if ok { "200 OK" } else { "400 Bad Request" },
+        body.len()
+    );
+    let _ = sock.write_all(resp.as_bytes()).await;
 }
 
 /// Pull the code out of an address pasted from the browser.
